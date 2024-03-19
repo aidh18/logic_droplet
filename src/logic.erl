@@ -7,15 +7,16 @@
 %%
 %%
 -module(logic).
--behaviour(gen_server).
+-behavior(gen_server).
 
 
 %% API
 -export([start/0,start/3,stop/0]).
 
 %% gen_server callbacks
--export([init/1,handle_call/3,handle_cast/3,handle_info/2,
-         terminate/2,code_change/3]).
+-export([init/1,deliver_api/1,request_location_api/1,transfer_package_api/1,
+         update_location_api/1,handle_call/3,handle_cast/3,handle_cast/2,
+         handle_info/2,terminate/2,code_change/3]).
 
 
 %%%===================================================================
@@ -59,6 +60,17 @@ start(Registration_type,Name,Args) ->
 stop() -> gen_server:call(?MODULE,stop).
 
 %% Any other API functions go here.
+deliver_api(Package_id) ->
+    gen_server:cast({deliver,Package_id},self(),some_db).
+
+request_location_api(Package_id) ->
+    gen_server:call({request_location,Package_id},self(),some_db).
+
+transfer_package_api({Package_id, Location_id}) ->
+    gen_server:cast({transfer_package,Package_id,Location_id},self(),some_db).
+
+update_location_api({Location_id,{Lat,Long}}) ->
+    gen_server:cast({update_location,Location_id,{Lat,Long}},self(),some_db).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -186,6 +198,8 @@ handle_cast({Unknown,_},From,_Db_Pid) ->
     {reply,{fail,unknown_cast_2,Unknown},From};
 handle_cast({Unknown,_,_},From,_Db_Pid) ->
     {reply,{fail,unknown_cast_3,Unknown},From}.
+handle_cast(_, _) ->
+    {reply,{fail,unknown_cast}}.
 
 %%--------------------------------------------------------------------
 %% @private
