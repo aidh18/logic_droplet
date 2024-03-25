@@ -3,7 +3,7 @@
 %% @end
 %%%-------------------------------------------------------------------
 
--module(logic_droplet_sup).
+-module(tracker_sup).
 
 -behaviour(supervisor).
 
@@ -26,10 +26,28 @@ start_link() ->
 %%                  type => worker(),       % optional
 %%                  modules => modules()}   % optional
 init([]) ->
-    SupFlags = #{strategy => one_for_all,
-                 intensity => 0,
-                 period => 1},
-    ChildSpecs = [],
+    SupFlags = #{strategy => one_for_one,
+                 intensity => 2,
+                 period => 3600},
+    ChildSpecs = [
+        child(tracker1, logic, worker),
+        child(tracker2, logic, worker),
+        child(tracker3, logic, worker),
+        child(tracker4, logic, worker)
+    ],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
+child(Id, Module, Type)->
+%% child_spec() = #{id => child_id(),       % mandatory
+%%                  start => mfargs(),      % mandatory
+%%                  restart => restart(),   % optional
+%%                  shutdown => shutdown(), % optional
+%%                  type => worker(),       % optional
+%%                  modules => modules()}   % optional
+    #{id => Id,
+	  start => {Module,start,[local, Id, []]},
+	  restart => permanent,
+	  shutdown => 2000,
+	  type => Type,
+	  modules => [Module]}.
