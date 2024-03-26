@@ -61,16 +61,23 @@ stop() -> gen_server:call(?MODULE,stop).
 
 %% Any other API functions go here.
 deliver_api(Package_id) ->
-    gen_server:cast({deliver,Package_id},self(),some_db).
+    gen_server:cast({deliver,<<Package_id>>},self(),db_pid).
 
 request_location_api(Package_id) ->
-    gen_server:call({request_location,Package_id},self(),some_db).
+    gen_server:call({request_location,<<Package_id>>},self(),db_pid),
+    receive
+        {reply,{fail,empty_key},_} -> 500;
+        {reply,{fail,invalid_key},_} -> 500;
+        {reply,{Lat,Long},_} -> {Lat,Long}
+    end.
+
+
 
 transfer_package_api({Package_id, Location_id}) ->
-    gen_server:cast({transfer_package,Package_id,Location_id},self(),some_db).
+    gen_server:cast({transfer_package,<<Package_id>>,<<Location_id>>},self(),db_pid).
 
 update_location_api({Location_id,{Lat,Long}}) ->
-    gen_server:cast({update_location,Location_id,{Lat,Long}},self(),some_db).
+    gen_server:cast({update_location,<<Location_id>>,{Lat,Long}},self(),db_pid).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -85,7 +92,8 @@ update_location_api({Location_id,{Lat,Long}}) ->
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok,term()}|{ok,term(),number()}|ignore |{stop,term()}.
 init([]) ->
-        {ok,replace_up}.
+    {ok, Pid} = riakc_pb_socket:start_link("db1.aidanstacey.com", 8087),
+    register(db_pid, Pid).
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
@@ -100,17 +108,17 @@ init([]) ->
                                   {noreply,term(),integer()} |
                                   {stop,term(),term(),integer()} | 
                                   {stop,term(),term()}.
-handle_call({request_location,Package_id},_From,Db_PID) ->
+handle_call({request_location,Package_id},From,Db_PID) ->
     if 
         not is_binary(Package_id) ->
             {reply,{fail,invalid_key},Db_PID};
         true ->
             case Package_id =:= <<"">> of
                 true ->
-                    {reply,{fail,empty_key},Db_PID};
+                    From ! {reply,{fail,empty_key},Db_PID};
                 _ ->
-                    Location_id = db_api:retrieve_data(packages,Package_id,Db_PID),
-                    {reply,db_api:retrieve_data(locations,Location_id,Db_PID),Db_PID}
+                    Location_id = db_api:retrieve_data(<<"Packages">>,Package_id,Db_PID),
+                    From ! {reply,db_api:retrieve_data(<<"Locations">>,Location_id,Db_PID),Db_PID}
             end
     end;
 handle_call(stop,_From,_State) ->
@@ -144,7 +152,7 @@ handle_cast({deliver,Package_id},_From,Db_PID) ->
                 true ->
                     {reply,{fail,empty_key},Db_PID};
                 _ ->
-                    {reply,db_api:store_data(packages,Package_id,<<"Delivered">>,Db_PID),Db_PID}
+                    {reply,db_api:store_data(<<"Packages">>,Package_id,<<"Delivered">>,Db_PID),Db_PID}
             end
     end;
 handle_cast({transfer_package,Package_id,Location_id},_From,Db_PID) ->
@@ -164,7 +172,7 @@ handle_cast({transfer_package,Package_id,Location_id},_From,Db_PID) ->
                                 true -> 
                                     {reply,{fail,empty_value},Db_PID};
                                 _ ->
-                                    {reply,db_api:store_data(packages,Package_id,Location_id,Db_PID),Db_PID}
+                                    {reply,db_api:store_data(<<"Packages">>,Package_id,Location_id,Db_PID),Db_PID}
                             end
                     end
             end
@@ -187,7 +195,7 @@ handle_cast({update_location,Location_id,{Lat,Long}},_From,Db_PID) ->
                                 true -> 
                                     {reply,{fail,invalid_location,Location_id},Db_PID};
                                 _ ->
-                                    {reply,db_api:store_data(locations,Location_id,{Lat,Long},Db_PID),Db_PID}
+                                    {reply,db_api:store_data(<<"Locations">>,Location_id,term_to_binary({Lat,Long}),Db_PID),Db_PID}
                             end
                     end
             end
@@ -290,9 +298,9 @@ deliver_test_() ->
         end,
     [% This is the list of tests to be generated and run.
         % Test: Correct Inputs
-        ?_assertEqual({reply,{packages,{<<"package_1">>,<<"Delivered">>}},some_Db_PID}, % Correct Input
+        ?_assertEqual({reply,{<<"Packages">>,{<<"package_1">>,<<"Delivered">>}},some_Db_PID}, % Correct Input
                         mock:handle_cast({deliver,<<"package_1">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{packages,{<<"package_2">>,<<"Delivered">>}},some_Db_PID}, % Correct Input
+        ?_assertEqual({reply,{<<"Packages">>,{<<"package_2">>,<<"Delivered">>}},some_Db_PID}, % Correct Input
                         mock:handle_cast({deliver,<<"package_2">>},some_from_pid,some_Db_PID)),
         % Test: Invalid Key
         ?_assertEqual({reply,{fail,empty_key},some_Db_PID}, % Empty Key
@@ -317,9 +325,9 @@ transfer_package_test_() ->
         end,
     [% This is the list of tests to be generated and run.
         % Test: Correct Inputs
-        ?_assertEqual({reply,{packages,{<<"package_1">>,<<"location_1">>}},some_Db_PID}, % Correct Input
+        ?_assertEqual({reply,{<<"Packages">>,{<<"package_1">>,<<"location_1">>}},some_Db_PID}, % Correct Input
                         mock:handle_cast({transfer_package,<<"package_1">>,<<"location_1">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{packages,{<<"package_1">>,<<"location_2">>}},some_Db_PID}, % Correct Input
+        ?_assertEqual({reply,{<<"Packages">>,{<<"package_1">>,<<"location_2">>}},some_Db_PID}, % Correct Input
                         mock:handle_cast({transfer_package,<<"package_1">>,<<"location_2">>},some_from_pid,some_Db_PID)),
         % Test: Empty Argument
         ?_assertEqual({reply,{fail,empty_key},some_Db_PID}, % Empty Key
@@ -356,9 +364,9 @@ update_location_test_() ->
         end,
     [% This is the list of tests to be generated and run.
         % Test: Correct Inputs
-        ?_assertEqual({reply,{locations,{<<"location_1">>,{43.0,111.0}}},some_Db_PID}, % Correct Input
+        ?_assertEqual({reply,{<<"Locations">>,{<<"location_1">>,{43.0,111.0}}},some_Db_PID}, % Correct Input
                         mock:handle_cast({update_location,<<"location_1">>,{43.0,111.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{locations,{<<"location_1">>,{44.0,112.0}}},some_Db_PID}, % Correct Input
+        ?_assertEqual({reply,{<<"Locations">>,{<<"location_1">>,{44.0,112.0}}},some_Db_PID}, % Correct Input
                         mock:handle_cast({update_location,<<"location_1">>,{44.0,112.0}},some_from_pid,some_Db_PID)),
         % Test: Invalid Key -> 
         ?_assertEqual({reply,{fail,empty_key},some_Db_PID}, % Empty Key
