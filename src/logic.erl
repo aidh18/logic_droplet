@@ -61,10 +61,10 @@ stop() -> gen_server:call(?MODULE,stop).
 
 %% Any other API functions go here.
 deliver_api(Package_id) ->
-    gen_server:cast({deliver,<<Package_id>>},self(),db_pid).
+    gen_server:cast(?MODULE, {deliver,list_to_binary(Package_id)},self(),db_pid).
 
 request_location_api(Package_id) ->
-    gen_server:call({request_location,<<Package_id>>},self(),db_pid),
+    gen_server:call(?MODULE, {request_location,list_to_binary(Package_id)}),
     receive
         {reply,{fail,empty_key},_} -> 500;
         {reply,{fail,invalid_key},_} -> 500;
@@ -74,10 +74,10 @@ request_location_api(Package_id) ->
 
 
 transfer_package_api({Package_id, Location_id}) ->
-    gen_server:cast({transfer_package,<<Package_id>>,<<Location_id>>},self(),db_pid).
+    gen_server:cast(?MODULE, {transfer_package,list_to_binary(Package_id),list_to_binary(Location_id)}).
 
 update_location_api({Location_id,{Lat,Long}}) ->
-    gen_server:cast({update_location,<<Location_id>>,{Lat,Long}},self(),db_pid).
+    gen_server:cast(?MODULE, {update_location,list_to_binary(Location_id),{Lat,Long}}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -92,8 +92,11 @@ update_location_api({Location_id,{Lat,Long}}) ->
 %%--------------------------------------------------------------------
 -spec init(term()) -> {ok,term()}|{ok,term(),number()}|ignore |{stop,term()}.
 init([]) ->
+    io:format("hello"),
     {ok, Pid} = riakc_pb_socket:start_link("db1.aidanstacey.com", 8087),
-    register(db_pid, Pid).
+    %% register(db_pid, Pid),
+    {ok, Pid}.
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
