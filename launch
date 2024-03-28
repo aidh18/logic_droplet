@@ -1,0 +1,10 @@
+#!/bin/bash
+
+# Check if the user provided an argument
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <name>"
+    exit 1
+fi
+
+# Launch rebar3 shell with provided argument
+sudo rebar3 shell --name "$1@logic.aidanstacey.com" --setcookie mycookie
