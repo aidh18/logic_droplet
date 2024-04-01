@@ -64,7 +64,7 @@ deliver_api(Package_id)->
     gen_server:cast(?MODULE,{deliver,Package_id}).
 
 request_location_api(Package_id)->
-    case gen_server:call(?MODULE,{request_location,Package_id}) of
+    case gen_server:call(tracker1,{request_location,Package_id}) of
         {reply,{error,empty_key},_}-> 500;
         {reply,{error,invalid_key},_}-> 500;
         {reply,{error,notfound},_}-> 500;
