@@ -109,29 +109,29 @@ init([])->
                                   {noreply,term(),integer()}  |
                                   {stop,term(),term(),integer()} |
                                   {stop,term(),term()}.
-handle_call({request_location,Package_id},_From,Db_PID)->
+handle_call({request_location,Package_id},_From,Db_pid)->
     if
         not is_list(Package_id)->
             io:format("not is_list"),
-            {reply,{error,invalid_key},Db_PID};
+            {reply,{error,invalid_key},Db_pid};
         true->
             io:format("is list"),
             case Package_id =:= "" of
                 true->
                     io:format("is empty_key"),
-                    {reply,{error,empty_key},Db_PID};
+                    {reply,{error,empty_key},Db_pid};
                 _->
                     io:format("is not empty_key"),
                     {_,Location_id,_} = db_api:retrieve_data("Packages",
                                                                 Package_id,
-                                                                Db_PID),
+                                                                Db_pid),
                     case Location_id of
                         {error,notfound}->
                             io:format("location notfound"),
-                            {reply,{error,notfound},Db_PID};
+                            {reply,{error,notfound},Db_pid};
                         _->
                             io:format("location found"),
-                            db_api:retrieve_data("Locations",Location_id)
+                            db_api:retrieve_data("Locations",Location_id,Db_pid)
                     end
             end
     end;
