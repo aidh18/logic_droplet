@@ -190,23 +190,28 @@ handle_cast({transfer_package,Package_id,Location_id},_From,Db_PID)->
 handle_cast({update_location,Location_id,{Lat,Long}},_From,Db_PID)->
     if
         not is_list(Location_id)->
+            io:format("u not_list\n"),
             {reply,{error,invalid_key},Db_PID};
         true->
             case Location_id =:= "" of
                 true->
+                    io:format("u empty_key\n"),
                     {reply,{error,empty_key},Db_PID};
                 _->
                     if
                         not is_float(Lat) orelse not is_float(Long)->
+                            io:format("t not is_float\n"),
                             {reply,{error,invalid_location,Location_id},Db_PID};
                         true->
                             Out_of_range = ((Lat > 90) orelse (Lat < -90) orelse
                                 (Long > 180) orelse (Long < -180)),
                             case Out_of_range of
                                 true->
+                                    io:format("t out_of_range\n"),
                                     {reply,{error,invalid_location,Location_id},
                                         Db_PID};
                                 _->
+                                    io:format("t in_range\n"),
                                     {reply,db_api:store_data("Locations",
                                                                 Location_id,
                                                                 {Lat,Long},
