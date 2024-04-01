@@ -112,27 +112,28 @@ init([])->
 handle_call({request_location,Package_id},_From,Db_pid)->
     if
         not is_list(Package_id)->
-            io:format("not is_list"),
+            io:format("not is_list\n"),
             {reply,{error,invalid_key},Db_pid};
         true->
-            io:format("is list"),
+            io:format("is list\n"),
             case Package_id =:= "" of
                 true->
-                    io:format("is empty_key"),
+                    io:format("is empty_key\n"),
                     {reply,{error,empty_key},Db_pid};
                 _->
-                    io:format("is not empty_key"),
+                    io:format("is not empty_key\n"),
                     {_,Location_id,_} = db_api:retrieve_data("Packages",
                                                                 Package_id,
                                                                 Db_pid),
+                    io:format("Location_id: ~s\n",[Location_id]),
                     case Location_id of
                         {error,notfound}->
-                            io:format("location notfound"),
+                            io:format("location notfound\n"),
                             {reply,{error,notfound},Db_pid};
                         _->
-                            io:format("location found"),
+                            io:format("location found\n"),
                             Idc = db_api:retrieve_data("Locations",Location_id,Db_pid),
-                            io:format(Idc),
+                            io:format("done"),
                             Idc
                     end
             end
