@@ -131,7 +131,9 @@ handle_call({request_location,Package_id},_From,Db_pid)->
                             {reply,{error,notfound},Db_pid};
                         _->
                             io:format("location found"),
-                            db_api:retrieve_data("Locations",Location_id,Db_pid)
+                            Idc = db_api:retrieve_data("Locations",Location_id,Db_pid),
+                            io:format(Idc),
+                            Idc
                     end
             end
     end;
