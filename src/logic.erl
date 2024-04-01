@@ -61,7 +61,7 @@ stop()-> gen_server:call(?MODULE,stop).
 
 %% Any other API functions go here.
 deliver_api(Package_id)->
-    gen_server:cast(?MODULE,{deliver,Package_id}).
+    gen_server:cast(tracker1,{deliver,Package_id}).
 
 request_location_api(Package_id)->
     case gen_server:call(tracker1,{request_location,Package_id}) of
@@ -72,10 +72,10 @@ request_location_api(Package_id)->
     end.
 
 transfer_package_api({Package_id,Location_id})->
-    gen_server:cast(?MODULE,{transfer_package,Package_id,Location_id}).
+    gen_server:cast(tracker1,{transfer_package,Package_id,Location_id}).
 
 update_location_api({Location_id,{Lat,Long}})->
-    gen_server:cast(?MODULE,{update_location,Location_id,{Lat,Long}}).
+    gen_server:cast(tracker1,{update_location,Location_id,{Lat,Long}}).
 
 %%%===================================================================
 %%% gen_server callbacks
