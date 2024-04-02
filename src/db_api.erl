@@ -2,11 +2,22 @@
 -export([store_data/4,retrieve_data/3]).
 
 
-store_data(Table_name,Key,Value,Pid)->
-	io:format("Table: ~s\nKey: ~s,\nValue: ~s",[Table_name, Key, Value]),
+store_data(Table_name,Key,Value,Pid) when not is_tuple(Value)->
 	Table_bin = list_to_binary(Table_name),
 	Key_bin = list_to_binary(Key),
 	Value_bin = list_to_binary(Value),
+	case retrieve_object(Table_bin, Key_bin, Pid) of
+		{ok,Object}->
+			New_object = riakc_obj:update_value(Object, Value_bin),
+            {reply,riakc_pb_socket:put(Pid, New_object),Pid};
+		_->
+			New_object = riakc_obj:new(Table_bin, Key_bin, Value_bin),
+			{reply,riakc_pb_socket:put(Pid, New_object),Pid}
+	end;
+store_data(Table_name,Key,Value,Pid)->
+	Table_bin = list_to_binary(Table_name),
+	Key_bin = list_to_binary(Key),
+	Value_bin = term_to_binary(Value),
 	case retrieve_object(Table_bin, Key_bin, Pid) of
 		{ok,Object}->
 			New_object = riakc_obj:update_value(Object, Value_bin),

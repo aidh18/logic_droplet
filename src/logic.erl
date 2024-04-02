@@ -15,8 +15,8 @@
 
 %% gen_server callbacks
 -export([init/1,deliver_api/1,request_location_api/1,transfer_package_api/1,
-         update_location_api/1,handle_call/3,handle_cast/3,handle_cast/2,
-         handle_info/2,terminate/2,code_change/3]).
+         update_location_api/1,handle_call/3,handle_cast/2,handle_info/2,
+         terminate/2,code_change/3]).
 
 
 %%%===================================================================
@@ -112,29 +112,21 @@ init([])->
 handle_call({request_location,Package_id},_From,Db_pid)->
     if
         not is_list(Package_id)->
-            io:format("not is_list\n"),
             {reply,{error,invalid_key},Db_pid};
         true->
-            io:format("is list\n"),
             case Package_id =:= "" of
                 true->
-                    io:format("is empty_key\n"),
                     {reply,{error,empty_key},Db_pid};
                 _->
-                    io:format("is not empty_key\n"),
                     {_,Location_id,_} = db_api:retrieve_data("Packages",
                                                                 Package_id,
                                                                 Db_pid),
                     io:format("Location_id: ~s\n",[Location_id]),
                     case Location_id of
                         {error,notfound}->
-                            io:format("location notfound\n"),
                             {reply,{error,notfound},Db_pid};
                         _->
-                            io:format("location found\n"),
-                            Idc = db_api:retrieve_data("Locations",Location_id,Db_pid),
-                            io:format("done"),
-                            Idc
+                            {reply,db_api:retrieve_data("Locations",Location_id,Db_pid),Db_pid}
                     end
             end
     end;
@@ -142,8 +134,9 @@ handle_call(stop,_From,_State)->
         {stop,normal,
                 replace_stopped,
           down}; %% setting the server's internal state to down
-handle_call({Unknown,_},From,_Db_Pid)->
+handle_call({Unknown,_},From,_Db_pid)->
     {reply,{error,unknown_call,Unknown},From}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -153,77 +146,61 @@ handle_call({Unknown,_},From,_Db_Pid)->
 %% @end
 %%--------------------------------------------------------------------
 %%
--spec handle_cast(Request::term(),From::pid(),State::term())->
-    {reply,term(),term()}  |
-    {reply,term(),term(),integer()}  |
-    {noreply,term()}  |
-    {noreply,term(),integer()}  |
-    {stop,term(),term(),integer()} |
-    {stop,term(),term()}.
-
-handle_cast({deliver,Package_id},_From,Db_PID)->
+handle_cast({deliver,Package_id},Db_pid)->
     if
         not is_list(Package_id)->
-            {reply,{error,invalid_key},Db_PID};
+            {noreply,Db_pid};
         true->
             case Package_id =:= "" of
                 true->
-                    {reply,{error,empty_key},Db_PID};
+                    {noreply,Db_pid};
                 _->
-                    {reply,db_api:store_data("Packages",Package_id,"Delivered",
-                                                Db_PID),Db_PID}
+                    db_api:store_data("Packages",Package_id,"Delivered",
+                                                Db_pid),
+                    {noreply,Db_pid}
             end
     end;
-handle_cast({transfer_package,Package_id,Location_id},_From,Db_PID)->
+handle_cast({transfer_package,Package_id,Location_id},Db_pid)->
     if
         not is_list(Package_id) orelse not is_list(Location_id)->
-            {reply,{error,invalid_input},Db_PID};
+            {noreply,Db_pid};
         true->
             if
                 Package_id =:= "" orelse Location_id =:= ""->
-                    {reply,{error,empty_key},Db_PID};
+                    {noreply,Db_pid};
                 true->
-                    {reply,db_api:store_data("Packages",Package_id,Location_id,
-                                                Db_PID),Db_PID}
+                    db_api:store_data("Packages",Package_id,Location_id,Db_pid),
+                    {noreply,Db_pid}
             end
     end;
-handle_cast({update_location,Location_id,{Lat,Long}},_From,Db_PID)->
+handle_cast({update_location,Location_id,{Lat,Long}},Db_pid)->
+    io:format("entered update"),
     if
         not is_list(Location_id)->
-            io:format("u not_list\n"),
-            {reply,{error,invalid_key},Db_PID};
+            {noreply,Db_pid};
         true->
             case Location_id =:= "" of
                 true->
-                    io:format("u empty_key\n"),
-                    {reply,{error,empty_key},Db_PID};
+                    {noreply,Db_pid};
                 _->
                     if
                         not is_float(Lat) orelse not is_float(Long)->
-                            io:format("t not is_float\n"),
-                            {reply,{error,invalid_location,Location_id},Db_PID};
+                            {noreply,Db_pid};
                         true->
                             Out_of_range = ((Lat > 90) orelse (Lat < -90) orelse
                                 (Long > 180) orelse (Long < -180)),
                             case Out_of_range of
                                 true->
-                                    io:format("t out_of_range\n"),
-                                    {reply,{error,invalid_location,Location_id},
-                                        Db_PID};
+                                    {noreply,Db_pid};
                                 _->
-                                    io:format("t in_range\n"),
-                                    {reply,db_api:store_data("Locations",
-                                                                Location_id,
-                                                                {Lat,Long},
-                                                                Db_PID),Db_PID}
+                                    db_api:store_data("Locations",Location_id,{Lat,Long},Db_pid),
+                                    {noreply,Db_pid}
                             end
                     end
             end
     end;
-handle_cast(stop,_From,_State)->
-    {stop,normal,replace_stopped,down}.
-handle_cast(_,_)->
-    {reply,{error,unknown_cast}}.
+handle_cast(_,Db_pid)->
+    {noreply,Db_pid}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -287,19 +264,19 @@ request_location_test_()->
      end,
     [% This is the list of tests to be generated and run.
         % Test: Correct Inputs
-        ?_assertEqual({reply,{{<<"Package_1">>,"data"},"data"},some_Db_PID},% Correct Input
-                        mock:handle_call({request_location,<<"Package_1">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{{<<"Package_2">>,"data"},"data"},some_Db_PID},% Correct Input
-                        mock:handle_call({request_location,<<"Package_2">>},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{{<<"Package_1">>,"data"},"data"},some_Db_pid},% Correct Input
+                        mock:handle_call({request_location,<<"Package_1">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{{<<"Package_2">>,"data"},"data"},some_Db_pid},% Correct Input
+                        mock:handle_call({request_location,<<"Package_2">>},some_from_pid,some_Db_pid)),
         % Test: Invalid Key
-        ?_assertEqual({reply,{error,empty_key},some_Db_PID},% Empty Key
-                        mock:handle_call({request_location,<<"">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_call({request_location,invalid},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_call({request_location,12345},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_call({request_location,"invalid"},some_from_pid,some_Db_PID))
+        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
+                        mock:handle_call({request_location,<<"">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_call({request_location,invalid},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_call({request_location,12345},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_call({request_location,"invalid"},some_from_pid,some_Db_pid))
     ]}.
 
 deliver_test_()->
@@ -316,17 +293,17 @@ deliver_test_()->
         % Test: Correct Inputs
         ?_assertEqual({reply,{"Packages",{"Package_1","Delivered"}}},% Correct Input
                         mock:deliver_api("Package_1")),
-        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_2">>,<<"Delivered">>}},some_Db_PID},% Correct Input
-                        mock:handle_cast({deliver,<<"Package_2">>},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_2">>,<<"Delivered">>}},some_Db_pid},% Correct Input
+                        mock:handle_cast({deliver,<<"Package_2">>},some_from_pid,some_Db_pid)),
         % Test: Invalid Key
-        ?_assertEqual({reply,{error,empty_key},some_Db_PID},% Empty Key
-                        mock:handle_cast({deliver,<<"">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({deliver,invalid},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({deliver,12345},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({deliver,"invalid"},some_from_pid,some_Db_PID))
+        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
+                        mock:handle_cast({deliver,<<"">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({deliver,invalid},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({deliver,12345},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({deliver,"invalid"},some_from_pid,some_Db_pid))
     ]}.
 
 transfer_package_test_()->
@@ -341,31 +318,31 @@ transfer_package_test_()->
         end,
     [% This is the list of tests to be generated and run.
         % Test: Correct Inputs
-        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_1">>,<<"Location_1">>}},some_Db_PID},% Correct Input
-                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"Location_1">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_1">>,<<"Location_2">>}},some_Db_PID},% Correct Input
-                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"Location_2">>},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_1">>,<<"Location_1">>}},some_Db_pid},% Correct Input
+                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"Location_1">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_1">>,<<"Location_2">>}},some_Db_pid},% Correct Input
+                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"Location_2">>},some_from_pid,some_Db_pid)),
         % Test: Empty Argument
-        ?_assertEqual({reply,{error,empty_key},some_Db_PID},% Empty Key
-                        mock:handle_cast({transfer_package,<<"">>,<<"Location_1">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,empty_key},some_Db_PID},% Empty Key and Value
-                        mock:handle_cast({transfer_package,<<"">>,<<"">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,empty_value},some_Db_PID},% Empty Value
-                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"">>},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
+                        mock:handle_cast({transfer_package,<<"">>,<<"Location_1">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key and Value
+                        mock:handle_cast({transfer_package,<<"">>,<<"">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,empty_value},some_Db_pid},% Empty Value
+                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"">>},some_from_pid,some_Db_pid)),
         % Test: Invalid Key
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({transfer_package,invalid,<<"Location_1">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({transfer_package,12345,<<"Location_1">>},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({transfer_package,"invalid",<<"Location_1">>},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({transfer_package,invalid,<<"Location_1">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({transfer_package,12345,<<"Location_1">>},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({transfer_package,"invalid",<<"Location_1">>},some_from_pid,some_Db_pid)),
         % Test: Invalid Value
-        ?_assertEqual({reply,{error,invalid_value},some_Db_PID},% Invalid Value Type
-                        mock:handle_cast({transfer_package,<<"Package_1">>,invalid},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_value},some_Db_PID},% Invalid Value Type
-                        mock:handle_cast({transfer_package,<<"Package_1">>,12345},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_value},some_Db_PID},% Invalid Value Type
-                        mock:handle_cast({transfer_package,<<"Package_1">>,"invalid"},some_from_pid,some_Db_PID))
+        ?_assertEqual({reply,{error,invalid_value},some_Db_pid},% Invalid Value Type
+                        mock:handle_cast({transfer_package,<<"Package_1">>,invalid},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_value},some_Db_pid},% Invalid Value Type
+                        mock:handle_cast({transfer_package,<<"Package_1">>,12345},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_value},some_Db_pid},% Invalid Value Type
+                        mock:handle_cast({transfer_package,<<"Package_1">>,"invalid"},some_from_pid,some_Db_pid))
 ]}.
 
 update_location_test_()->
@@ -380,52 +357,52 @@ update_location_test_()->
         end,
     [% This is the list of tests to be generated and run.
         % Test: Correct Inputs
-        ?_assertEqual({reply,{list_to_binary("Locations"),{<<"Location_1">>,{43.0,111.0}}},some_Db_PID},% Correct Input
-                        mock:handle_cast({update_location,<<"Location_1">>,{43.0,111.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{list_to_binary("Locations"),{<<"Location_1">>,{44.0,112.0}}},some_Db_PID},% Correct Input
-                        mock:handle_cast({update_location,<<"Location_1">>,{44.0,112.0}},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{list_to_binary("Locations"),{<<"Location_1">>,{43.0,111.0}}},some_Db_pid},% Correct Input
+                        mock:handle_cast({update_location,<<"Location_1">>,{43.0,111.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{list_to_binary("Locations"),{<<"Location_1">>,{44.0,112.0}}},some_Db_pid},% Correct Input
+                        mock:handle_cast({update_location,<<"Location_1">>,{44.0,112.0}},some_from_pid,some_Db_pid)),
         % Test: Invalid Key->
-        ?_assertEqual({reply,{error,empty_key},some_Db_PID},% Empty Key
-                        mock:handle_cast({update_location,<<"">>,{43.0,111.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({update_location,invalid,{43.0,181.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({update_location,12345,{43.0,181.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_PID},% Invalid Key Type
-                        mock:handle_cast({update_location,"invalid",{43.0,181.0}},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
+                        mock:handle_cast({update_location,<<"">>,{43.0,111.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({update_location,invalid,{43.0,181.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({update_location,12345,{43.0,181.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
+                        mock:handle_cast({update_location,"invalid",{43.0,181.0}},some_from_pid,some_Db_pid)),
         % Test: Invalid Latitude->
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_1">>},some_Db_PID},% Out Of Range
-                        mock:handle_cast({update_location,<<"truck_1">>,{-91.0,111.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_1">>},some_Db_PID},% Out of Range
-                        mock:handle_cast({update_location,<<"truck_1">>,{91.0,111.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Invalid Latitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{invalid,181.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Invalid Latitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{<<"invalid">>,181.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Invalid Latitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{"invalid",181.0}},some_from_pid,some_Db_PID)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_1">>},some_Db_pid},% Out Of Range
+                        mock:handle_cast({update_location,<<"truck_1">>,{-91.0,111.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_1">>},some_Db_pid},% Out of Range
+                        mock:handle_cast({update_location,<<"truck_1">>,{91.0,111.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Latitude Type
+                        mock:handle_cast({update_location,<<"truck_2">>,{invalid,181.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Latitude Type
+                        mock:handle_cast({update_location,<<"truck_2">>,{<<"invalid">>,181.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Latitude Type
+                        mock:handle_cast({update_location,<<"truck_2">>,{"invalid",181.0}},some_from_pid,some_Db_pid)),
         % Test: Invalid Longitude->
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Out Of Range
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,-181.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Out Of Range
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,181.0}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Invalid Longitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,invalid}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Invalid Longitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,<<"invalid">>}},some_from_pid,some_Db_PID)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_PID},% Invalid Longitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,"invalid"}},some_from_pid,some_Db_PID))
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Out Of Range
+                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,-181.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Out Of Range
+                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,181.0}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Longitude Type
+                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,invalid}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Longitude Type
+                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,<<"invalid">>}},some_from_pid,some_Db_pid)),
+        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Longitude Type
+                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,"invalid"}},some_from_pid,some_Db_pid))
     ]}.
 
 unknown_call_test_()->
     [% This is the list of tests to be generated and run.
         % Test: Unknown Call
         ?_assertEqual({reply,{error,unknown_call,idk_1},some_from_pid},% Unknown Call
-                        mock:handle_call({idk_1,doesntmatter},some_from_pid,some_Db_PID)),
+                        mock:handle_call({idk_1,doesntmatter},some_from_pid,some_Db_pid)),
         ?_assertEqual({reply,{error,unknown_call,idk_2},some_from_pid},% Unknown Call
-                        mock:handle_call({idk_2,doesntmatter},some_from_pid,some_Db_PID)),
+                        mock:handle_call({idk_2,doesntmatter},some_from_pid,some_Db_pid)),
         ?_assertEqual({reply,{error,unknown_call,idk_3},some_from_pid},% Unknown Call
-                        mock:handle_call({idk_3,doesntmatter},some_from_pid,some_Db_PID))
+                        mock:handle_call({idk_3,doesntmatter},some_from_pid,some_Db_pid))
     ].
 
 
