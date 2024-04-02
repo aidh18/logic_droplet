@@ -3,6 +3,7 @@
 
 
 store_data(Table_name,Key,Value,Pid)->
+	io:format("Table: ~s\nKey: ~s,\nValue: ~s",[Table_name, Key, Value]),
 	Table_bin = list_to_binary(Table_name),
 	Key_bin = list_to_binary(Key),
 	Value_bin = list_to_binary(Value),
