@@ -121,7 +121,6 @@ handle_call({request_location,Package_id},_From,Db_pid)->
                     {_,Location_id,_} = db_api:retrieve_data("Packages",
                                                                 Package_id,
                                                                 Db_pid),
-                    io:format("Location_id: ~s\n",[Location_id]),
                     case Location_id of
                         {error,notfound}->
                             {reply,{error,notfound},Db_pid};
@@ -174,7 +173,6 @@ handle_cast({transfer_package,Package_id,Location_id},Db_pid)->
             end
     end;
 handle_cast({update_location,Location_id,{Lat,Long}},Db_pid)->
-    io:format("entered update"),
     if
         not is_list(Location_id)->
             {noreply,Db_pid};
