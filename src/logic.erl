@@ -68,7 +68,8 @@ request_location_api(Package_id)->
         {reply,{error,empty_key},_}-> 500;
         {reply,{error,invalid_key},_}-> 500;
         {reply,{error,notfound},_}-> 500;
-        {reply,{Lat,Long},_}-> {Lat,Long}
+        {reply,{Lat,Long},_}-> {Lat,Long};
+        {reply,_,_}-> "Delivered"
     end.
 
 transfer_package_api({Package_id,Location_id})->
