@@ -38,10 +38,8 @@ retrieve_data(Table_name,Key,Pid) when Table_name =:= "Packages"->
 retrieve_data(Table_name,Key,Pid) when Table_name =:= "Locations"->
     case retrieve_object(list_to_binary(Table_name),list_to_binary(Key),Pid) of
 	    {ok,Object}->
-			io:format("found!!!"),
 			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
 	    Error->
-			io:format("not found!!!"),
 			{reply,Error,Pid}
 	end;
 retrieve_data(Table_name,Key,Pid)->

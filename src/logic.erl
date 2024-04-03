@@ -122,6 +122,8 @@ handle_call({request_location,Package_id},_From,Db_pid)->
                                                                 Package_id,
                                                                 Db_pid),
                     case Location_id of
+                        "Delivered"->
+                            {reply,Location_id,Db_pid};
                         {error,notfound}->
                             {reply,{error,notfound},Db_pid};
                         _->
