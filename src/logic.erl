@@ -65,11 +65,11 @@ deliver_api(Package_id)->
 
 request_location_api(Package_id)->
     case gen_server:call(tracker1,{request_location,Package_id}) of
-        {reply,{error,empty_key},_}-> 500;
-        {reply,{error,invalid_key},_}-> 500;
-        {reply,{error,notfound},_}-> 500;
-        {reply,{Lat,Long},_}-> {Lat,Long};
-        {reply,_,_}-> "Delivered"
+        {error,empty_key}-> 500;
+        {error,invalid_key}-> 500;
+        {error,notfound}-> 500;
+        {Lat,Long}-> {Lat,Long};
+        _-> "Delivered"
     end.
 
 transfer_package_api({Package_id,Location_id})->
