@@ -153,7 +153,7 @@ init(Identifiers) ->
 
 handle_call(next, _From, {[],[]}=State) ->
         {reply,empty_list_error,State};
-handle_call(next, _From, {Front,Back}) when is_list(Front) == false ->
+handle_call(next, _From, {Front,_}) when is_list(Front) == false ->
         {reply,non_list_error,{[],[]}};
 handle_call(next, _From, {[H|T],[]}) ->
         {reply,H,{T,[H]}};
