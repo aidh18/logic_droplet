@@ -30,12 +30,13 @@ init([]) ->
                  intensity => 2,
                  period => 3600},
     ChildSpecs = [
-        child(tracker_sup, supervisor)
+        child(rrobin, worker, [[tracker1,tracker2,tracker3,tracker4]]),
+        child(tracker_sup, supervisor, [])
     ],
     {ok, {SupFlags, ChildSpecs}}.
 
 %% internal functions
-child(Module, Type)->
+child(Module, Type, Args)->
 %% child_spec() = #{id => child_id(),       % mandatory
 %%                  start => mfargs(),      % mandatory
 %%                  restart => restart(),   % optional
@@ -43,7 +44,7 @@ child(Module, Type)->
 %%                  type => worker(),       % optional
 %%                  modules => modules()}   % optional
     #{id => Module,
-	  start => {Module,start_link,[]},
+	  start => {Module,start,Args},
 	  restart => permanent,
 	  shutdown => 2000,
 	  type => Type,

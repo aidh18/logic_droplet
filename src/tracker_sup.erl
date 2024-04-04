@@ -7,13 +7,13 @@
 
 -behaviour(supervisor).
 
--export([start_link/0]).
+-export([start/0]).
 
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
 
-start_link() ->
+start() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 %% sup_flags() = #{strategy => strategy(),         % optional

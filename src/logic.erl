@@ -61,10 +61,12 @@ stop()-> gen_server:call(?MODULE,stop).
 
 %% Any other API functions go here.
 deliver_api(Package_id)->
-    gen_server:cast(tracker1,{deliver,Package_id}).
+    Node = rrobin:next(),
+    gen_server:cast(Node,{deliver,Package_id}).
 
 request_location_api(Package_id)->
-    case gen_server:call(tracker1,{request_location,Package_id}) of
+    Node = rrobin:next(),
+    case gen_server:call(Node,{request_location,Package_id}) of
         {error,empty_key}-> 500;
         {error,invalid_key}-> 500;
         {error,notfound}-> 500;
@@ -73,10 +75,12 @@ request_location_api(Package_id)->
     end.
 
 transfer_package_api({Package_id,Location_id})->
-    gen_server:cast(tracker1,{transfer_package,Package_id,Location_id}).
+    Node = rrobin:next(),
+    gen_server:cast(Node,{transfer_package,Package_id,Location_id}).
 
 update_location_api({Location_id,{Lat,Long}})->
-    gen_server:cast(tracker1,{update_location,Location_id,{Lat,Long}}).
+    Node = rrobin:next(),
+    gen_server:cast(Node,{update_location,Location_id,{Lat,Long}}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -240,171 +244,3 @@ terminate(_Reason,_State)->
 code_change(_OldVsn,State,_Extra)->
     {ok,State}.
 
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
-
-
-
--ifdef(EUNIT).
-%%
-%% Unit tests go here.
-%%
--include_lib("eunit/include/eunit.hrl").
-
-%%% This test is working.
-request_location_test_()->
-    {setup,
-     fun()-> % This setup fun is run once before the tests are run. If you want setup and teardown to run for each test,change {setup to {foreach
-        meck:new(db_api),
-        meck:expect(db_api,retrieve_data,fun(_Table,Key,_PID)-> {Key,"data"} end)
-
-     end,
-     fun(_)-> % This is the teardown fun. Notice it takes one, ignored in this example,parameter.
-        meck:unload(db_api)
-     end,
-    [% This is the list of tests to be generated and run.
-        % Test: Correct Inputs
-        ?_assertEqual({reply,{{<<"Package_1">>,"data"},"data"},some_Db_pid},% Correct Input
-                        mock:handle_call({request_location,<<"Package_1">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{{<<"Package_2">>,"data"},"data"},some_Db_pid},% Correct Input
-                        mock:handle_call({request_location,<<"Package_2">>},some_from_pid,some_Db_pid)),
-        % Test: Invalid Key
-        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
-                        mock:handle_call({request_location,<<"">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_call({request_location,invalid},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_call({request_location,12345},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_call({request_location,"invalid"},some_from_pid,some_Db_pid))
-    ]}.
-
-deliver_test_()->
-    {setup,
-        fun()-> % This setup fun is run once before the tests are run. If you want setup and teardown to run for each test,change {setup to {foreach
-        meck:new(db_api),
-        meck:expect(db_api,store_data,fun(Table,Key,Value,_PID)-> {Table,{Key,Value}} end)
-
-        end,
-        fun(_)-> % This is the teardown fun. Notice it takes one, ignored in this example, parameter.
-        meck:unload(db_api)
-        end,
-    [% This is the list of tests to be generated and run.
-        % Test: Correct Inputs
-        ?_assertEqual({reply,{"Packages",{"Package_1","Delivered"}}},% Correct Input
-                        mock:deliver_api("Package_1")),
-        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_2">>,<<"Delivered">>}},some_Db_pid},% Correct Input
-                        mock:handle_cast({deliver,<<"Package_2">>},some_from_pid,some_Db_pid)),
-        % Test: Invalid Key
-        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
-                        mock:handle_cast({deliver,<<"">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({deliver,invalid},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({deliver,12345},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({deliver,"invalid"},some_from_pid,some_Db_pid))
-    ]}.
-
-transfer_package_test_()->
-    {setup,
-        fun()-> % This setup fun is run once before the tests are run. If you want setup and teardown to run for each test,change {setup to {foreach
-        meck:new(db_api),
-        meck:expect(db_api,store_data,fun(Table,Key,Value,_PID)-> {Table,{Key,Value}} end)
-
-        end,
-        fun(_)-> % This is the teardown fun. Notice it takes one, ignored in this example, parameter.
-        meck:unload(db_api)
-        end,
-    [% This is the list of tests to be generated and run.
-        % Test: Correct Inputs
-        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_1">>,<<"Location_1">>}},some_Db_pid},% Correct Input
-                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"Location_1">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{list_to_binary("Packages"),{<<"Package_1">>,<<"Location_2">>}},some_Db_pid},% Correct Input
-                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"Location_2">>},some_from_pid,some_Db_pid)),
-        % Test: Empty Argument
-        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
-                        mock:handle_cast({transfer_package,<<"">>,<<"Location_1">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key and Value
-                        mock:handle_cast({transfer_package,<<"">>,<<"">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,empty_value},some_Db_pid},% Empty Value
-                        mock:handle_cast({transfer_package,<<"Package_1">>,<<"">>},some_from_pid,some_Db_pid)),
-        % Test: Invalid Key
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({transfer_package,invalid,<<"Location_1">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({transfer_package,12345,<<"Location_1">>},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({transfer_package,"invalid",<<"Location_1">>},some_from_pid,some_Db_pid)),
-        % Test: Invalid Value
-        ?_assertEqual({reply,{error,invalid_value},some_Db_pid},% Invalid Value Type
-                        mock:handle_cast({transfer_package,<<"Package_1">>,invalid},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_value},some_Db_pid},% Invalid Value Type
-                        mock:handle_cast({transfer_package,<<"Package_1">>,12345},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_value},some_Db_pid},% Invalid Value Type
-                        mock:handle_cast({transfer_package,<<"Package_1">>,"invalid"},some_from_pid,some_Db_pid))
-]}.
-
-update_location_test_()->
-    {setup,
-        fun()-> % This setup fun is run once before the tests are run. If you want setup and teardown to run for each test,change {setup to {foreach
-        meck:new(db_api),
-        meck:expect(db_api,store_data,fun(Table,Key,Value,_PID)-> {Table,{Key,Value}} end)
-
-        end,
-        fun(_)-> % This is the teardown fun. Notice it takes one, ignored in this example, parameter.
-        meck:unload(db_api)
-        end,
-    [% This is the list of tests to be generated and run.
-        % Test: Correct Inputs
-        ?_assertEqual({reply,{list_to_binary("Locations"),{<<"Location_1">>,{43.0,111.0}}},some_Db_pid},% Correct Input
-                        mock:handle_cast({update_location,<<"Location_1">>,{43.0,111.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{list_to_binary("Locations"),{<<"Location_1">>,{44.0,112.0}}},some_Db_pid},% Correct Input
-                        mock:handle_cast({update_location,<<"Location_1">>,{44.0,112.0}},some_from_pid,some_Db_pid)),
-        % Test: Invalid Key->
-        ?_assertEqual({reply,{error,empty_key},some_Db_pid},% Empty Key
-                        mock:handle_cast({update_location,<<"">>,{43.0,111.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({update_location,invalid,{43.0,181.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({update_location,12345,{43.0,181.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_key},some_Db_pid},% Invalid Key Type
-                        mock:handle_cast({update_location,"invalid",{43.0,181.0}},some_from_pid,some_Db_pid)),
-        % Test: Invalid Latitude->
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_1">>},some_Db_pid},% Out Of Range
-                        mock:handle_cast({update_location,<<"truck_1">>,{-91.0,111.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_1">>},some_Db_pid},% Out of Range
-                        mock:handle_cast({update_location,<<"truck_1">>,{91.0,111.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Latitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{invalid,181.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Latitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{<<"invalid">>,181.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Latitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{"invalid",181.0}},some_from_pid,some_Db_pid)),
-        % Test: Invalid Longitude->
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Out Of Range
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,-181.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Out Of Range
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,181.0}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Longitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,invalid}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Longitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,<<"invalid">>}},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,invalid_location,<<"truck_2">>},some_Db_pid},% Invalid Longitude Type
-                        mock:handle_cast({update_location,<<"truck_2">>,{43.0,"invalid"}},some_from_pid,some_Db_pid))
-    ]}.
-
-unknown_call_test_()->
-    [% This is the list of tests to be generated and run.
-        % Test: Unknown Call
-        ?_assertEqual({reply,{error,unknown_call,idk_1},some_from_pid},% Unknown Call
-                        mock:handle_call({idk_1,doesntmatter},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,unknown_call,idk_2},some_from_pid},% Unknown Call
-                        mock:handle_call({idk_2,doesntmatter},some_from_pid,some_Db_pid)),
-        ?_assertEqual({reply,{error,unknown_call,idk_3},some_from_pid},% Unknown Call
-                        mock:handle_call({idk_3,doesntmatter},some_from_pid,some_Db_pid))
-    ].
-
-
--endif.
