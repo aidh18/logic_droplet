@@ -14,9 +14,9 @@
 -export([start/0,start/3,stop/0]).
 
 %% gen_server callbacks
--export([init/1,deliver_api/1,request_location_api/1,transfer_package_api/1,
-         update_location_api/1,handle_call/3,handle_cast/2,handle_info/2,
-         terminate/2,code_change/3]).
+-export([init/1,request_hours_api/1,request_login_api/3,update_hours_api/3,
+         update_login_api/2,get_hours/2,get_employees/3,handle_call/3,
+         handle_cast/2,handle_info/2,terminate/2,code_change/3]).
 
 
 %%%===================================================================
@@ -60,27 +60,44 @@ start(Registration_type,Name,Args)->
 stop()-> gen_server:call(?MODULE,stop).
 
 %% Any other API functions go here.
-deliver_api(Package_id)->
-    Node = rrobin:next(),
-    gen_server:cast(Node,{deliver,Package_id}).
 
-request_location_api(Package_id)->
+request_hours_api(User_id)->
     Node = rrobin:next(),
-    case gen_server:call(Node,{request_location,Package_id}) of
-        {error,empty_key}-> 500;
-        {error,invalid_key}-> 500;
+    case gen_server:call(Node,{request_hours,User_id}) of
+        {error,invalid_id}-> 500;
+        {error,empty_id}-> 500;
         {error,notfound}-> 500;
-        {Lat,Long}-> {Lat,Long};
-        _-> "Delivered"
+        Response-> Response
     end.
 
-transfer_package_api({Package_id,Location_id})->
+request_login_api(_User_id,Username,Password)->
     Node = rrobin:next(),
-    gen_server:cast(Node,{transfer_package,Package_id,Location_id}).
+    case gen_server:call(Node,{request_login,{Username,Password}}) of
+        {error,invalid_id}-> 500;
+        {error,empty_id}-> 500;
+        {error,notfound}-> 500;
+        Response-> Response
+    end.
 
-update_location_api({Location_id,{Lat,Long}})->
+update_hours_api(User_id,Date,Hours)->
     Node = rrobin:next(),
-    gen_server:cast(Node,{update_location,Location_id,{Lat,Long}}).
+    gen_server:cast(Node,{update_hours,{User_id,Date,Hours}}).
+
+update_login_api(Username,New_password)->
+    Node = rrobin:next(),
+    gen_server:cast(Node,{update_login,{Username,New_password}}).
+
+
+get_hours(Employee_id,Db_pid)->
+    db_api:retrieve_data("Employees",Employee_id,Db_pid).
+
+get_employees(Employees,Hours,_) when Employees =:= []->
+    Hours;
+get_employees(Employees,Hours,Db_pid)->
+    [H|T] = Employees,
+    Data = get_hours(H,Db_pid),
+    get_employees(T,Hours ++ Data,Db_pid).
+
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -114,25 +131,51 @@ init([])->
                                   {noreply,term(),integer()}  |
                                   {stop,term(),term(),integer()} |
                                   {stop,term(),term()}.
-handle_call({request_location,Package_id},_From,Db_pid)->
+handle_call({request_hours,User_id},_From,Db_pid)->
     if
-        not is_list(Package_id)->
-            {reply,{error,invalid_key},Db_pid};
+        not is_list(User_id)->
+            {reply,{error,invalid_id},Db_pid};
         true->
-            case Package_id =:= "" of
+            case User_id =:= "" of
                 true->
-                    {reply,{error,empty_key},Db_pid};
+                    {reply,{error,empty_id},Db_pid};
                 _->
-                    {_,Location_id,_} = db_api:retrieve_data("Packages",
-                                                                Package_id,
+                    [H|_] = User_id,
+                    if
+                        H =:= "W"->
+                            {_,Employees,_} = db_api:retrieve_data("Employers",
+                                                                User_id,
                                                                 Db_pid),
-                    case Location_id of
-                        "Delivered"->
-                            {reply,Location_id,Db_pid};
-                        {error,notfound}->
-                            {reply,{error,notfound},Db_pid};
-                        _->
-                            {reply,db_api:retrieve_data("Locations",Location_id,Db_pid),Db_pid}
+                            if
+                                is_list(Employees)->
+                                    get_employees(Employees,[],Db_pid);
+                                true->
+                                    {reply,{error,invalid_id,Db_pid}}
+                            end;
+                        true->
+                            get_hours(User_id,Db_pid)
+                    end
+            end
+    end;
+handle_call({request_login,{Username,Password}},_From,Db_pid)->
+    if
+        not is_list(Username)->
+            {reply,{error,invalid_username},Db_pid};
+        not is_list(Password)->
+            {reply,{error,invalid_password},Db_pid};
+        true->
+            case Username =:= "" of
+                true->
+                    {reply,{error,empty_username},Db_pid};
+                _->
+                    {_,{Saved,User_id},_} = db_api:retrieve_data("Usernames",
+                                                                Username,
+                                                                Db_pid),
+                    if
+                        Saved =:= Password->
+                            {reply,User_id,Db_pid};
+                        true->
+                            {reply,invalid_password,Db_pid}
                     end
             end
     end;
@@ -152,56 +195,41 @@ handle_call({Unknown,_},From,_Db_pid)->
 %% @end
 %%--------------------------------------------------------------------
 %%
-handle_cast({deliver,Package_id},Db_pid)->
+handle_cast({update_hours,{User_id,Date,Hours}},Db_pid)->
     if
-        not is_list(Package_id)->
+        not is_list(User_id)->
+            io:format("update_hours: User_id is not a list."),
             {noreply,Db_pid};
         true->
-            case Package_id =:= "" of
+            case User_id =:= "" of
                 true->
+                    io:format("update_hours: User_id is empty."),
                     {noreply,Db_pid};
                 _->
-                    db_api:store_data("Packages",Package_id,"Delivered",
+                    db_api:store_data("Employees",User_id,{Date,Hours},
                                                 Db_pid),
                     {noreply,Db_pid}
             end
     end;
-handle_cast({transfer_package,Package_id,Location_id},Db_pid)->
+handle_cast({update_login,{Username,New_password}},Db_pid)->
     if
-        not is_list(Package_id) orelse not is_list(Location_id)->
+        not is_list(Username)->
+            io:format("update_login: Username is not a list."),
+            {noreply,Db_pid};
+        not is_list(New_password)->
+            io:format("update_login: New_password is not a list."),
             {noreply,Db_pid};
         true->
             if
-                Package_id =:= "" orelse Location_id =:= ""->
+                Username =:= ""->
+                    io:format("update_login: Username is empty."),
+                    {noreply,Db_pid};
+                New_password =:= ""->
+                    io:format("update_login: New_password is empty."),
                     {noreply,Db_pid};
                 true->
-                    db_api:store_data("Packages",Package_id,Location_id,Db_pid),
+                    db_api:store_data("Locations",Username,New_password,Db_pid),
                     {noreply,Db_pid}
-            end
-    end;
-handle_cast({update_location,Location_id,{Lat,Long}},Db_pid)->
-    if
-        not is_list(Location_id)->
-            {noreply,Db_pid};
-        true->
-            case Location_id =:= "" of
-                true->
-                    {noreply,Db_pid};
-                _->
-                    if
-                        not is_float(Lat) orelse not is_float(Long)->
-                            {noreply,Db_pid};
-                        true->
-                            Out_of_range = ((Lat > 90) orelse (Lat < -90) orelse
-                                (Long > 180) orelse (Long < -180)),
-                            case Out_of_range of
-                                true->
-                                    {noreply,Db_pid};
-                                _->
-                                    db_api:store_data("Locations",Location_id,{Lat,Long},Db_pid),
-                                    {noreply,Db_pid}
-                            end
-                    end
             end
     end;
 handle_cast(_,Db_pid)->
