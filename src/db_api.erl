@@ -3,8 +3,8 @@
 
 
 store_data(settings,User_id,{Setting_type,Setting},Pid)->
-	Table_bin = term_to_binary("Settings"),
-	Key_bin = term_to_binary(User_id),
+	Table_bin = list_to_binary("Settings"),
+	Key_bin = list_to_binary(User_id),
 	case retrieve_object(Table_bin,Key_bin,Pid) of
 		{ok,Object}->
 			Map = binary_to_term(riakc_obj:get_value(Object)),
@@ -26,8 +26,8 @@ store_data(settings,User_id,{Setting_type,Setting},Pid)->
 			{reply,riakc_pb_socket:put(Pid,New_object),Pid}
 	end;
 store_data(Table_name,num,Employee_id,Pid)->
-		Table_bin = term_to_binary(Table_name),
-		Num_bin = term_to_binary("Num_of_employees"),
+		Table_bin = list_to_binary(Table_name),
+		Num_bin = list_to_binary("Num_of_employees"),
 		Employee_id_bin = term_to_binary(Employee_id),
 		case retrieve_object(Table_bin,Num_bin,Pid) of
 			{ok,Object}->
@@ -45,8 +45,8 @@ store_data(Table_name,num,Employee_id,Pid)->
 				{reply,riakc_pb_socket:put(Pid,New_object),Pid}
 		end;
 store_data(Table_name,Key,{login,Password,User_id},Pid)->
-	Table_bin = term_to_binary(Table_name),
-	Key_bin = term_to_binary(Key),
+	Table_bin = list_to_binary(Table_name),
+	Key_bin = list_to_binary(Key),
 	User_bin = term_to_binary(User_id),
 	case retrieve_object(Table_bin,Key_bin,Pid) of
 		{ok,Object}->
@@ -57,8 +57,8 @@ store_data(Table_name,Key,{login,Password,User_id},Pid)->
 			{reply,riakc_pb_socket:put(Pid,New_object),Pid}
 	end;
 store_data(Table_name,Key,{hours,Date,Hours},Pid)->
-	Table_bin = term_to_binary(Table_name),
-	Key_bin = term_to_binary(Key),
+	Table_bin = list_to_binary(Table_name),
+	Key_bin = list_to_binary(Key),
 	case retrieve_object(Table_bin,Key_bin,Pid) of
 		{ok,Object}->
 			Map = binary_to_term(riakc_obj:get_value(Object)),
@@ -80,9 +80,9 @@ store_data(Table_name,Key,{hours,Date,Hours},Pid)->
 			{reply,riakc_pb_socket:put(Pid,New_object),Pid}
 	end;
 store_data(Table_name,Key,Value,Pid)->
-	Table_bin = term_to_binary(Table_name),
-	Key_bin = term_to_binary(Key),
-	Value_bin = term_to_binary(Value),
+	Table_bin = list_to_binary(Table_name),
+	Key_bin = list_to_binary(Key),
+	Value_bin = list_to_binary(Value),
 	case retrieve_object(Table_bin,Key_bin,Pid) of
 		{ok,Object}->
 			New_object = riakc_obj:update_value(Object,Value_bin),
@@ -94,49 +94,49 @@ store_data(Table_name,Key,Value,Pid)->
 
 
 retrieve_data(settings,Key,Pid)->
-	case retrieve_object(term_to_binary("Settings"),term_to_binary(Key),Pid) of
+	case retrieve_object(list_to_binary("Settings"),list_to_binary(Key),Pid) of
 		{ok,Object}->
 			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
 		Error->
 			{reply,Error,Pid}
 	end;
 retrieve_data(Table_name,{index,Key},Pid)->
-	case retrieve_object(term_to_binary(Table_name),integer_to_binary(Key),Pid) of
+	case retrieve_object(list_to_binary(Table_name),integer_to_binary(Key),Pid) of
 		{ok,Object}->
 			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
 		Error->
 			{reply,Error,Pid}
 	end;
 retrieve_data(employees,Key,Pid)->
-	case retrieve_object(term_to_binary("Employees"),term_to_binary(Key),Pid) of
+	case retrieve_object(list_to_binary("Employees"),list_to_binary(Key),Pid) of
 		{ok,Object}->
 			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
 		Error->
 			{reply,Error,Pid}
 	end;
 retrieve_data(Table_name,first,Pid)->
-    case retrieve_object(term_to_binary(Table_name),term_to_binary("Num_of_employees"),Pid) of
+    case retrieve_object(list_to_binary(Table_name),list_to_binary("Num_of_employees"),Pid) of
 	    {ok,Object}->
 			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
 	    Error->
 			{reply,Error,Pid}
 	end;
 retrieve_data(Table_name,Key,Pid) when is_list(Table_name)->
-    case retrieve_object(term_to_binary(Table_name),term_to_binary(Key),Pid) of
+    case retrieve_object(list_to_binary(Table_name),list_to_binary(Key),Pid) of
 	    {ok,Object}->
-			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
+			{reply,binary_to_list(riakc_obj:get_value(Object)),Pid};
 	    Error->
 			{reply,Error,Pid}
 	end;
 retrieve_data(usernames,Key,Pid)->
-    case retrieve_object(term_to_binary("Usernames"),term_to_binary(Key),Pid) of
+    case retrieve_object(list_to_binary("Usernames"),list_to_binary(Key),Pid) of
 	    {ok,Object}->
 			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
 	    Error->
 			{reply,Error,Pid}
 	end;
 retrieve_data(Table_name,Key,Pid)->
-    case retrieve_object(term_to_binary(Table_name),term_to_binary(Key),Pid) of
+    case retrieve_object(list_to_binary(Table_name),list_to_binary(Key),Pid) of
 	    {ok,Object}->
 			{reply,binary_to_term(riakc_obj:get_value(Object)),Pid};
 	    Error->
