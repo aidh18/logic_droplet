@@ -186,7 +186,7 @@ handle_call({request_hours,{Is_employer,User_id}},_From,Db_pid)->
                                     {reply,{error,invalid_id,Db_pid}}
                             end;
                         true->
-                            get_hours(User_id,Db_pid)
+                            {reply,get_hours(User_id,Db_pid),Db_pid}
                     end
             end
     end;
