@@ -31,14 +31,14 @@ store_data(Table_name,num,Employee_id,Pid)->
 		Employee_id_bin = term_to_binary(Employee_id),
 		case retrieve_object(Table_bin,Num_bin,Pid) of
 			{ok,Object}->
-				Num_of_employees = binary_to_integer(riakc_obj:get_value(Object)),
-				New_number_bin = integer_to_binary(Num_of_employees + 1),
+				Num_of_employees = binary_to_term(riakc_obj:get_value(Object)),
+				New_number_bin = term_to_binary(Num_of_employees + 1),
 				Updated_number = riakc_obj:update_value(Object,Num_of_employees + 1),
 				riakc_pb_socket:put(Pid,Updated_number),
 				New_object = riakc_obj:new(Table_bin,New_number_bin,Employee_id_bin),
 				{reply,riakc_pb_socket:put(Pid,New_object),Pid};
 			_->
-				New_number_bin = integer_to_binary(0),
+				New_number_bin = term_to_binary(0),
 				New_num_object = riakc_obj:new(Table_bin,Num_bin,New_number_bin),
 				riakc_pb_socket:put(Pid,New_num_object),
 				New_object = riakc_obj:new(Table_bin,New_number_bin,Employee_id_bin),
