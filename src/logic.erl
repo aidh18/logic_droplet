@@ -123,10 +123,8 @@ get_name(Employee_id)->
 get_hours(Employee_id,Db_pid)->
     if
         Employee_id =:= {error,notfound}->
-            io:format("\n\n\n\n\nNOPE\n\n\n\n\n"),
             not_found;
         true->
-            io:format("\n\n\n\n\n~s\n\n\n\n\n",[Employee_id]),
             {_,Hours,_} = db_api:retrieve_data(employees,Employee_id,Db_pid),
             [get_name(Employee_id),Hours]
     end.
