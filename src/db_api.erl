@@ -64,7 +64,7 @@ store_data(Table_name,Key,{hours,Date,Hours},Pid)->
 			Map = binary_to_term(riakc_obj:get_value(Object)),
 			case maps:find(Date,Map) of
 				{ok,Value} ->
-					New_map = Map#{Date := Value + Hours},
+					New_map = Map#{Date := list_to_integer(Value) + Hours},
 					Map_bin = term_to_binary(New_map),
 					New_object = riakc_obj:update_value(Object,Map_bin),
             		{reply,riakc_pb_socket:put(Pid,New_object),Pid};

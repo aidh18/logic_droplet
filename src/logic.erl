@@ -16,8 +16,8 @@
 %% gen_server callbacks
 -export([init/1,request_hours_api/2,request_login_api/2,request_name_api/1,
 request_settings_api/1,update_hours_api/3,update_login_api/3,update_name_api/2,
-update_settings/3,get_hours/2,get_employees/4,add_employees_api/2,test/2,
-handle_call/3,handle_cast/2,handle_info/2,terminate/2,code_change/3]).
+update_settings/3,get_hours/2,get_employees/4,get_name/1,add_employees_api/2,
+test/2,handle_call/3,handle_cast/2,handle_info/2,terminate/2,code_change/3]).
 
 %%%===================================================================
 %%% API
@@ -116,17 +116,34 @@ update_name_api(User_id,Name)->
     Node = rrobin:next(),
     gen_server:cast(Node,{update_name,{User_id,Name}}).
 
+
+get_name(Employee_id)->
+    request_name_api(Employee_id).
+
 get_hours(Employee_id,Db_pid)->
-    Name = request_name_api(Employee_id),
-    {_,Hours,_} = db_api:retrieve_data(employees,Employee_id,Db_pid),
-    [Name,Hours].
+    if
+        Employee_id =:= {error,notfound}->
+            io:format("\n\n\n\n\nNOPE\n\n\n\n\n"),
+            not_found;
+        true->
+            io:format("\n\n\n\n\n~s\n\n\n\n\n",[Employee_id]),
+            {_,Hours,_} = db_api:retrieve_data(employees,Employee_id,Db_pid),
+            [get_name(Employee_id),Hours]
+    end.
+
+
 
 get_employees(_,Index,Hours,_) when Index < 0->
     Hours;
 get_employees(Employer_id,Index,Hours,Db_pid)->
     {_,Employee_id,_} = db_api:retrieve_data(Employer_id,{index,Index},Db_pid),
     Data = get_hours(Employee_id,Db_pid),
-    get_employees(Employer_id,Index - 1,Hours ++ [Data],Db_pid).
+    if
+        Data =:= not_found->
+            get_employees(Employer_id,Index - 1,Hours,Db_pid);
+        true->
+            get_employees(Employer_id,Index - 1,Hours ++ [Data],Db_pid)
+    end.
 
 test(Table_name,Key)->
     Node = rrobin:next(),
