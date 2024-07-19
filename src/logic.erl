@@ -165,7 +165,7 @@ init([])->
         {ok,Db_pid}-> {ok,Db_pid};
         _-> {stop,link_failure}
     end.
-% logic:request_hours_api(true,"testboi1").
+
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
